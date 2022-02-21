@@ -6,6 +6,12 @@
 # See /LICENSE for more information.
 #
 
+# LAN_DG
+# LAN_AC
+# WAN_AC
+# WAN_FW
+# WAN_DG
+
 _get_reserved_ipv4() {
   cat <<- EOF
 	0.0.0.0/8
@@ -58,6 +64,10 @@ _remove_comment() {
   sed '/^#/ d'
 }
 
+_exist_var() {
+  [ -n "$1" ]
+}
+
 _ipset_execute() {
   ipset -exist restore <<- EOF
 	$@
@@ -92,29 +102,69 @@ flush_rules() {
 }
 
 init_ipset() {
+  # TODO: use one line
   # create
   _ipset_execute create transproxy_src_direct hash:ip hashsize 64 family inet
   _ipset_execute create transproxy_src_global hash:ip hashsize 64 family inet
-  _ipset_execute create transproxy_src_normal hash:ip hashsize 64 family inet
+  _ipset_execute create transproxy_src_control hash:ip hashsize 64 family inet
+  _ipset_execute create transproxy_dst_special hash:net hashsize 64 family inet
   _ipset_execute create transproxy_dst_direct hash:net hashsize 64 family inet
-  _ipset_execute create transproxy_dst_global hash:net hashsize 64 family inet
   _ipset_execute create transproxy_dst_normal hash:net hashsize 64 family inet
 
-  # reserved
-  _ipset_execute "$(_get_reserved_ipv4 | _add_prefix 'transproxy_dst_direct ')"
+  # special
+  _ipset_execute "$(_get_reserved_ipv4 | _add_prefix 'add transproxy_dst_direct ')"
 
   # src sets
-  _ipset_execute "$(cat /etc/transproxy/src-direct.txt | _remove_empty | _remove_comment | _add_prefix 'transproxy_src_direct ')"
-  _ipset_execute "$(cat /etc/transproxy/src-global.txt | _remove_empty | _remove_comment | _add_prefix 'transproxy_src_global ')"
-  _ipset_execute "$(cat /etc/transproxy/src-normal.txt | _remove_empty | _remove_comment | _add_prefix 'transproxy_src_normal ')"
+  _ipset_execute "$(cat /etc/transproxy/src-direct.txt | _remove_empty | _remove_comment | _add_prefix 'add transproxy_src_direct ')"
+  _ipset_execute "$(cat /etc/transproxy/src-global.txt | _remove_empty | _remove_comment | _add_prefix 'add transproxy_src_global ')"
+  _ipset_execute "$(cat /etc/transproxy/src-normal.txt | _remove_empty | _remove_comment | _add_prefix 'add transproxy_src_normal ')"
 
   # dst sets
-  _ipset_execute "$(cat /etc/transproxy/dst-direct.txt | _remove_empty | _remove_comment | _add_prefix 'transproxy_dst_direct ')"
-  _ipset_execute "$(cat /etc/transproxy/dst-global.txt | _remove_empty | _remove_comment | _add_prefix 'transproxy_dst_global ')"
-  _ipset_execute "$(cat /etc/transproxy/dst-normal.txt | _remove_empty | _remove_comment | _add_prefix 'transproxy_dst_normal ')"
+  _ipset_execute "$(cat /etc/transproxy/dst-global.txt | _remove_empty | _remove_comment | _add_prefix 'add transproxy_dst_reserved ')"
+  _ipset_execute "$(cat /etc/transproxy/dst-direct.txt | _remove_empty | _remove_comment | _add_prefix 'add transproxy_dst_direct ')"
+  _ipset_execute "$(cat /etc/transproxy/dst-normal.txt | _remove_empty | _remove_comment | _add_prefix 'add transproxy_dst_normal ')"
+}
+
+gen_prerouting_rules() {
+  local proto="$1"
+  if _exist_var "$INTERFACES"; then
+    for interface in $INTERFACES; do
+      echo -I PREROUTING 1 -i $interface -p $proto -j SS_SPEC_LAN_DG
+    done
+  else
+    echo -I PREROUTING 1 -p $proto -j SS_SPEC_LAN_DG
+  fi
 }
 
 iptables_nat() {
+  local table="$1"
+  local proto="$2"
+
+  iptables-restore -n <<- EOF
+	*$table
+
+	:TRANSPROXY_LAN_PREPARE - [0:0]
+	:TRANSPROXY_LAN_CONTROL - [0:0]
+	:TRANSPROXY_WAN_CONTROL - [0:0]
+	:TRANSPROXY_WAN_FORWARD - [0:0]
+
+	# PREPARE
+	-A TRANSPROXY_LAN_PREPARE -m set --match-set transproxy_dst_special dst -j RETURN
+	-A TRANSPROXY_LAN_PREPARE -p $proto $IPTABLES_EXTRA_ARGS -j TRANSPROXY_LAN_CONTROL
+
+	# LAN
+	-A TRANSPROXY_LAN_CONTROL -m set --match-set transproxy_src_direct src -j RETURN
+	-A TRANSPROXY_LAN_CONTROL -m set --match-set transproxy_src_forward src -j TRANSPROXY_WAN_FORWARD
+	-A TRANSPROXY_LAN_CONTROL -m set --match-set transproxy_src_control src -j TRANSPROXY_WAN_CONTROL
+	-A TRANSPROXY_LAN_CONTROL -j $LAN_DEFAULT_TARGET
+
+	# WAN
+	-A TRANSPROXY_WAN_CONTROL -m set --match-set transproxy_dst_direct dst -j RETURN
+	-A TRANSPROXY_WAN_CONTROL -m set --match-set transproxy_dst_global dst -j TRANSPROXY_WAN_FORWARD
+	-A TRANSPROXY_WAN_CONTROL -j $WAN_DEFAULT_TARGET
+
+	COMMIT
+	EOF
 }
 
 iptables_mangle() {
