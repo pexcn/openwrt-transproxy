@@ -1,4 +1,4 @@
-#!/bin/sh -e
+#!/bin/sh
 #
 # Copyright (C) 2021-2022 Sing Yu Chan <i@pexcn.me>
 #
@@ -85,17 +85,17 @@ flush_transproxy() {
 init_ipset() {
   ipset -exist restore <<- EOF
 	create transproxy_src_direct hash:ip hashsize 64 family inet
-	create transproxy_src_global hash:ip hashsize 64 family inet
-        create transproxy_src_normal hash:ip hashsize 64 family inet
+	create transproxy_src_proxy hash:ip hashsize 64 family inet
+	create transproxy_src_checkdst hash:ip hashsize 64 family inet
 	create transproxy_dst_direct hash:net hashsize 64 family inet
-	create transproxy_dst_global hash:net hashsize 64 family inet
-        create transproxy_dst_special hash:net hashsize 64 family inet
+	create transproxy_dst_proxy hash:net hashsize 64 family inet
+	create transproxy_dst_special hash:net hashsize 64 family inet
 	$(cat /etc/transproxy/src-direct.txt | _remove_empty | _remove_comment | _add_prefix 'add transproxy_src_direct ')
-	$(cat /etc/transproxy/src-global.txt | _remove_empty | _remove_comment | _add_prefix 'add transproxy_src_global ')
-        $(cat /etc/transproxy/src-normal.txt | _remove_empty | _remove_comment | _add_prefix 'add transproxy_src_normal ')
+	$(cat /etc/transproxy/src-proxy.txt | _remove_empty | _remove_comment | _add_prefix 'add transproxy_src_proxy ')
+	$(cat /etc/transproxy/src-checkdst.txt | _remove_empty | _remove_comment | _add_prefix 'add transproxy_src_checkdst ')
 	$(cat /etc/transproxy/dst-direct.txt | _remove_empty | _remove_comment | _add_prefix 'add transproxy_dst_direct ')
-	$(cat /etc/transproxy/dst-global.txt | _remove_empty | _remove_comment | _add_prefix 'add transproxy_dst_global ')
-        $(_get_reserved_ipv4 | _add_prefix 'add transproxy_dst_special ')
+	$(cat /etc/transproxy/dst-proxy.txt | _remove_empty | _remove_comment | _add_prefix 'add transproxy_dst_proxy ')
+	$(_get_reserved_ipv4 | _add_prefix 'add transproxy_dst_special ')
 	EOF
 }
 
@@ -107,26 +107,26 @@ apply_iptables_rules() {
 	*$table
 
 	:TRANSPROXY_SRC_PREPARE - [0:0]
-	:TRANSPROXY_SRC_CONTROL - [0:0]
-	:TRANSPROXY_DST_CONTROL - [0:0]
+	:TRANSPROXY_SRC_AC - [0:0]
+	:TRANSPROXY_DST_AC - [0:0]
 	:TRANSPROXY_DST_FORWARD - [0:0]
 
 	# PREPARE
 	-A TRANSPROXY_SRC_PREPARE -m set --match-set transproxy_dst_special dst -j RETURN
-	-A TRANSPROXY_SRC_PREPARE -p $proto $IPTABLES_EXTRA_ARGS -j TRANSPROXY_SRC_CONTROL
+	-A TRANSPROXY_SRC_PREPARE -p $proto $IPTABLES_EXTRA_ARGS -j TRANSPROXY_SRC_AC
 
-	# SRC AC
-	-A TRANSPROXY_SRC_CONTROL -m set --match-set transproxy_src_direct src -j RETURN
-	-A TRANSPROXY_SRC_CONTROL -m set --match-set transproxy_src_global src -j TRANSPROXY_DST_FORWARD
-	-A TRANSPROXY_SRC_CONTROL -m set --match-set transproxy_src_normal src -j TRANSPROXY_DST_CONTROL
-	-A TRANSPROXY_SRC_CONTROL -j $SRC_DEFAULT_TARGET
+	# SRC
+	-A TRANSPROXY_SRC_AC -m set --match-set transproxy_src_direct src -j RETURN
+	-A TRANSPROXY_SRC_AC -m set --match-set transproxy_src_proxy src -j TRANSPROXY_DST_FORWARD
+	-A TRANSPROXY_SRC_AC -m set --match-set transproxy_src_checkdst src -j TRANSPROXY_DST_AC
+	-A TRANSPROXY_SRC_AC -j $SRC_DEFAULT_TARGET
 
-	# DST AC
-	-A TRANSPROXY_DST_CONTROL -m set --match-set transproxy_dst_direct dst -j RETURN
-	-A TRANSPROXY_DST_CONTROL -m set --match-set transproxy_dst_global dst -j TRANSPROXY_DST_FORWARD
-	-A TRANSPROXY_DST_CONTROL -j $DST_DEFAULT_TARGET
+	# DST
+	-A TRANSPROXY_DST_AC -m set --match-set transproxy_dst_direct dst -j RETURN
+	-A TRANSPROXY_DST_AC -m set --match-set transproxy_dst_proxy dst -j TRANSPROXY_DST_FORWARD
+	-A TRANSPROXY_DST_AC -j $DST_DEFAULT_TARGET
 
-        $(gen_prerouting_rules $proto)
+	$(gen_prerouting_rules $proto)
 
 	COMMIT
 	EOF
@@ -161,14 +161,14 @@ init_iptables_udp() {
   ip rule add fwmark 1 lookup 100
   ip route add local default dev lo table 100
   apply_iptables_rules mangle udp
-  iptables -t mangle -A TRANSPROXY_DST_FORWARD -p udp -j TPROXY --on-port $UDP_REMOTE_PORT --tproxy-mark 1
+  iptables -t mangle -A TRANSPROXY_DST_FORWARD -p udp -j TPROXY --on-ip $UDP_REMOTE_ADDR --on-port $UDP_REMOTE_PORT --tproxy-mark 1
 
   # TODO: refine by https://github.com/openwrt/packages/blob/e60310eb2ebf256efb60c6fb6841c3edb30467dc/net/shadowsocks-libev/files/ss-rules
   if [ "$SELF_PROXY" = 1 ]; then
     iptables -t mangle -N TRANSPROXY_DST_PREPARE
     iptables -t mangle -A TRANSPROXY_DST_PREPARE -m set --match-set transproxy_dst_special -j RETURN
-    iptables -t mangle -A TRANSPROXY_DST_PREPARE -m set --match-set transproxy_dst_global dst -j MARK --set-mark 1
-    if [ "$DST_DEFAULT_TARGET" = "TRANSPROXY_DST_CONTROL" ]; then
+    iptables -t mangle -A TRANSPROXY_DST_PREPARE -m set --match-set transproxy_dst_proxy dst -j MARK --set-mark 1
+    if [ "$DST_DEFAULT_TARGET" = "TRANSPROXY_DST_AC" ]; then
       iptables -t mangle -A TRANSPROXY_DST_PREPARE -m set --match-set transproxy_dst_direct dst -j RETURN
     fi
     iptables -t mangle -A TRANSPROXY_DST_PREPARE -p udp $IPTABLES_EXTRA_ARGS -j MARK --set-mark 1
@@ -178,6 +178,10 @@ init_iptables_udp() {
 }
 
 parse_args() {
+  SRC_DEFAULT_TARGET=TRANSPROXY_DST_AC
+  DST_DEFAULT_TARGET=TRANSPROXY_DST_FORWARD
+
+
   while [ "$#" -gt 0 ]; do
     case "$1" in
       -r|--remote)
@@ -217,7 +221,7 @@ parse_args() {
 }
 
 parse_args "$@"
-flush_rules
+flush_transproxy
 init_ipset
 init_iptables_tcp
 init_iptables_udp
