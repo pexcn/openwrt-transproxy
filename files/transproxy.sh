@@ -90,11 +90,11 @@ init_ipset() {
 	create transproxy_dst_direct hash:net hashsize 64 family inet
 	create transproxy_dst_proxy hash:net hashsize 64 family inet
 	create transproxy_dst_special hash:net hashsize 64 family inet
-	$(cat /etc/transproxy/src-direct.txt | _remove_empty | _remove_comment | _add_prefix 'add transproxy_src_direct ')
-	$(cat /etc/transproxy/src-proxy.txt | _remove_empty | _remove_comment | _add_prefix 'add transproxy_src_proxy ')
-	$(cat /etc/transproxy/src-checkdst.txt | _remove_empty | _remove_comment | _add_prefix 'add transproxy_src_checkdst ')
-	$(cat /etc/transproxy/dst-direct.txt | _remove_empty | _remove_comment | _add_prefix 'add transproxy_dst_direct ')
-	$(cat /etc/transproxy/dst-proxy.txt | _remove_empty | _remove_comment | _add_prefix 'add transproxy_dst_proxy ')
+	$(cat $SRC_DIRECT_FILE | _remove_empty | _remove_comment | _add_prefix 'add transproxy_src_direct ')
+	$(cat $SRC_PROXY_FILE | _remove_empty | _remove_comment | _add_prefix 'add transproxy_src_proxy ')
+	$(cat $SRC_CHECKDST_FILE | _remove_empty | _remove_comment | _add_prefix 'add transproxy_src_checkdst ')
+	$(cat $DST_DIRECT_FILE | _remove_empty | _remove_comment | _add_prefix 'add transproxy_dst_direct ')
+	$(cat $DST_PROXY_FILE | _remove_empty | _remove_comment | _add_prefix 'add transproxy_dst_proxy ')
 	$(_get_reserved_ipv4 | _add_prefix 'add transproxy_dst_special ')
 	EOF
 }
@@ -178,9 +178,13 @@ init_iptables_udp() {
 }
 
 parse_args() {
+  SRC_DIRECT_FILE=/etc/transproxy/src-direct.txt
+  SRC_PROXY_FILE=/etc/transproxy/src-proxy.txt
+  SRC_CHECKDST_FILE=/etc/transproxy/src-checkdst.txt
+  DST_DIRECT_FILE=/etc/transproxy/dst-direct.txt
+  DST_PROXY_FILE=/etc/transproxy/dst-proxy.txt
   SRC_DEFAULT_TARGET=TRANSPROXY_DST_AC
   DST_DEFAULT_TARGET=TRANSPROXY_DST_FORWARD
-
 
   while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -198,6 +202,26 @@ parse_args() {
         ;;
       -P|--udp-port)
         UDP_REMOTE_PORT="$2"
+        shift 2
+        ;;
+      --src-direct)
+        SRC_DIRECT_FILE="$2"
+        shift 2
+        ;;
+      --src-proxy)
+        SRC_PROXY_FILE="$2"
+        shift 2
+        ;;
+      --src-checkdst)
+        SRC_CHECKDST_FILE="$2"
+        shift 2
+        ;;
+      --dst-direct)
+        DST_DIRECT_FILE="$2"
+        shift 2
+        ;;
+      --dst-proxy)
+        DST_PROXY_FILE="$2"
         shift 2
         ;;
       --self-proxy)
