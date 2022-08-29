@@ -20,7 +20,12 @@ _remove_comment() {
   sed '/^#/ d'
 }
 
+_split_by_space() {
+  tr ',' ' '
+}
+
 _get_reserved_ipv4() {
+  # TODO: review needed
   cat <<- EOF
 	0.0.0.0/8
 	10.0.0.0/8
@@ -43,7 +48,7 @@ _get_reserved_ipv4() {
 }
 
 _get_reserved_ipv6() {
-  # TODO: redo
+  # TODO: review needed
   cat <<- EOF
 	::/127
 	::ffff:0:0/96
@@ -60,13 +65,17 @@ _get_reserved_ipv6() {
 	EOF
 }
 
-#log() {
+#_log() {
 #  # 1:alert, 2:crit, 3:err, 4:warn, 5:notice, 6:info, 7:debug, 8:emerg
 #  logger -st transproxy[$$] -p $1 $2
 #}
 
 print_usage() {
-  echo "TODO..."
+  cat << EOF
+Usage: $0 [options]
+    -f, --flush    Flush iptables, ipset then exit
+    -h, --help     Show this help message then exit
+EOF
 }
 
 flush_transproxy() {
@@ -90,11 +99,11 @@ init_ipset() {
 	create transproxy_dst_direct hash:net hashsize 64 family inet
 	create transproxy_dst_proxy hash:net hashsize 64 family inet
 	create transproxy_dst_special hash:net hashsize 64 family inet
-	$(cat $SRC_DIRECT_FILE | _remove_empty | _remove_comment | _add_prefix 'add transproxy_src_direct ')
-	$(cat $SRC_PROXY_FILE | _remove_empty | _remove_comment | _add_prefix 'add transproxy_src_proxy ')
-	$(cat $SRC_CHECKDST_FILE | _remove_empty | _remove_comment | _add_prefix 'add transproxy_src_checkdst ')
-	$(cat $DST_DIRECT_FILE | _remove_empty | _remove_comment | _add_prefix 'add transproxy_dst_direct ')
-	$(cat $DST_PROXY_FILE | _remove_empty | _remove_comment | _add_prefix 'add transproxy_dst_proxy ')
+	$(cat $(echo $SRC_DIRECT_FILES | _split_by_space) | _remove_empty | _remove_comment | _add_prefix 'add transproxy_src_direct ')
+	$(cat $(echo $SRC_PROXY_FILES | _split_by_space) | _remove_empty | _remove_comment | _add_prefix 'add transproxy_src_proxy ')
+	$(cat $(echo $SRC_CHECKDST_FILES | _split_by_space) | _remove_empty | _remove_comment | _add_prefix 'add transproxy_src_checkdst ')
+	$(cat $(echo $DST_DIRECT_FILES | _split_by_space) | _remove_empty | _remove_comment | _add_prefix 'add transproxy_dst_direct ')
+	$(cat $(echo $DST_PROXY_FILES | _split_by_space) | _remove_empty | _remove_comment | _add_prefix 'add transproxy_dst_proxy ')
 	$(_get_reserved_ipv4 | _add_prefix 'add transproxy_dst_special ')
 	EOF
 }
@@ -178,11 +187,11 @@ init_iptables_udp() {
 }
 
 parse_args() {
-  SRC_DIRECT_FILE=/etc/transproxy/src-direct.txt
-  SRC_PROXY_FILE=/etc/transproxy/src-proxy.txt
-  SRC_CHECKDST_FILE=/etc/transproxy/src-checkdst.txt
-  DST_DIRECT_FILE=/etc/transproxy/dst-direct.txt
-  DST_PROXY_FILE=/etc/transproxy/dst-proxy.txt
+  SRC_DIRECT_FILES=/etc/transproxy/src-direct.txt
+  SRC_PROXY_FILES=/etc/transproxy/src-proxy.txt
+  SRC_CHECKDST_FILES=/etc/transproxy/src-checkdst.txt
+  DST_DIRECT_FILES=/etc/transproxy/dst-direct.txt
+  DST_PROXY_FILES=/etc/transproxy/dst-proxy.txt
   SRC_DEFAULT_TARGET=TRANSPROXY_DST_AC
   DST_DEFAULT_TARGET=TRANSPROXY_DST_FORWARD
 
@@ -205,33 +214,33 @@ parse_args() {
         shift 2
         ;;
       --src-direct)
-        SRC_DIRECT_FILE="$2"
+        SRC_DIRECT_FILES="$2"
         shift 2
         ;;
       --src-proxy)
-        SRC_PROXY_FILE="$2"
+        SRC_PROXY_FILES="$2"
         shift 2
         ;;
       --src-checkdst)
-        SRC_CHECKDST_FILE="$2"
+        SRC_CHECKDST_FILES="$2"
         shift 2
         ;;
       --dst-direct)
-        DST_DIRECT_FILE="$2"
+        DST_DIRECT_FILES="$2"
         shift 2
         ;;
       --dst-proxy)
-        DST_PROXY_FILE="$2"
+        DST_PROXY_FILES="$2"
         shift 2
         ;;
       --self-proxy)
         SELF_PROXY=1;
         shift 1
         ;;
-#      --ipv4-only)
-#        IPV4_ONLY=1
-#        shift 1
-#        ;;
+      --disable-ipv6)
+        DISABLE_IPV6=1
+        shift 1
+        ;;
       -h|--help)
         print_usage
         exit 0
