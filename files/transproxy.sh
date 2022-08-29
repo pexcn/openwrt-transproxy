@@ -8,6 +8,9 @@
 # See /LICENSE for more information.
 #
 
+# TODO:
+#   1. Check OUTPUT chain should use -A ... or -I, which better?
+
 _add_prefix() {
   sed "s/^/$1/"
 }
@@ -71,6 +74,7 @@ _get_reserved_ipv6() {
 #}
 
 print_usage() {
+  # TODO
   cat << EOF
 Usage: $0 [options]
     -f, --flush    Flush iptables, ipset then exit
@@ -78,7 +82,7 @@ Usage: $0 [options]
 EOF
 }
 
-flush_transproxy() {
+flush_rules() {
   iptables-save --counters | grep -v "TRANSPROXY_" | iptables-restore --counters
 
   ip rule del fwmark 1 lookup 100 2>/dev/null || true
@@ -89,6 +93,11 @@ flush_transproxy() {
     ipset flush $name 2>/dev/null || true
     ipset destroy $name 2>/dev/null || true
   done
+}
+
+init_route() {
+  ip rule add fwmark 1 lookup 100
+  ip route add local default dev lo table 100
 }
 
 init_ipset() {
@@ -108,9 +117,8 @@ init_ipset() {
 	EOF
 }
 
-apply_iptables_rules() {
+create_transproxy_chain() {
   local table="$1"
-  local proto="$2"
 
   iptables-restore -n <<- EOF
 	*$table
@@ -135,56 +143,65 @@ apply_iptables_rules() {
 	-A TRANSPROXY_DST_AC -m set --match-set transproxy_dst_proxy dst -j TRANSPROXY_DST_FORWARD
 	-A TRANSPROXY_DST_AC -j $DST_DEFAULT_TARGET
 
-	$(gen_prerouting_rules $proto)
-
 	COMMIT
 	EOF
 }
 
-gen_prerouting_rules() {
-  local proto="$1"
+apply_transproxy_rules() {
+  local table="$1"
+  local proto="$2"
+
   if [ -z "$INTERFACES" ]; then
-    echo -I PREROUTING 1 -p $proto -j TRANSPROXY_SRC_PREPARE
+    iptables -t $table -I PREROUTING 1 -p $proto -j TRANSPROXY_SRC_PREPARE
   else
     for interface in $INTERFACES; do
-      echo -I PREROUTING 1 -i $interface -p $proto -j TRANSPROXY_SRC_PREPARE
+      iptables -t $table -I PREROUTING 1 -i $interface -p $proto -j TRANSPROXY_SRC_PREPARE
     done
   fi
 }
 
-init_iptables_tcp() {
-  apply_iptables_rules nat tcp
-  iptables -t nat -A TRANSPROXY_DST_FORWARD -p tcp -j REDIRECT --to-ports $REMOTE_PORT || return 1
+init_iptables() {
+  # create common transproxy chain to mangle table, it's required for both tcp and udp.
+  create_transproxy_chain mangle
 
-  # TODO: refine by https://github.com/openwrt/packages/blob/e60310eb2ebf256efb60c6fb6841c3edb30467dc/net/shadowsocks-libev/files/ss-rules
-  if [ "$SELF_PROXY" = 1 ]; then
-    iptables -t nat -N TRANSPROXY_DST_PREPARE
-    iptables -t nat -A TRANSPROXY_DST_PREPARE -m set --match-set transproxy_dst_special dst -j RETURN
-    iptables -t nat -A TRANSPROXY_DST_PREPARE -p tcp $IPTABLES_EXTRA_ARGS -j $DST_DEFAULT_TARGET
-    iptables -t nat -I OUTPUT 1 -p tcp -j TRANSPROXY_DST_PREPARE
-  fi
-  return $?
-}
-
-init_iptables_udp() {
-  ip rule add fwmark 1 lookup 100
-  ip route add local default dev lo table 100
-  apply_iptables_rules mangle udp
+  # apply transparent proxy rules
+  apply_transproxy_rules mangle tcp
+  iptables -t mangle -A TRANSPROXY_DST_FORWARD -p tcp -j TPROXY --on-ip $REMOTE_ADDR --on-port $REMOTE_PORT --tproxy-mark 1
+  apply_transproxy_rules mangle udp
   iptables -t mangle -A TRANSPROXY_DST_FORWARD -p udp -j TPROXY --on-ip $UDP_REMOTE_ADDR --on-port $UDP_REMOTE_PORT --tproxy-mark 1
 
-  # TODO: refine by https://github.com/openwrt/packages/blob/e60310eb2ebf256efb60c6fb6841c3edb30467dc/net/shadowsocks-libev/files/ss-rules
-  if [ "$SELF_PROXY" = 1 ]; then
+  if [ -n "$SELF_PROXY" ]; then
     iptables -t mangle -N TRANSPROXY_DST_PREPARE
-    iptables -t mangle -A TRANSPROXY_DST_PREPARE -m set --match-set transproxy_dst_special -j RETURN
-    iptables -t mangle -A TRANSPROXY_DST_PREPARE -m set --match-set transproxy_dst_proxy dst -j MARK --set-mark 1
-    if [ "$DST_DEFAULT_TARGET" = "TRANSPROXY_DST_AC" ]; then
-      iptables -t mangle -A TRANSPROXY_DST_PREPARE -m set --match-set transproxy_dst_direct dst -j RETURN
-    fi
-    iptables -t mangle -A TRANSPROXY_DST_PREPARE -p udp $IPTABLES_EXTRA_ARGS -j MARK --set-mark 1
-    iptables -t mangle -I OUTPUT 1 -p udp -j TRANSPROXY_DST_PREPARE
+    iptables -t mangle -A TRANSPROXY_DST_PREPARE -m set --match-set transproxy_dst_special dst -j RETURN
+    iptables -t mangle -A TRANSPROXY_DST_PREPARE -j RETURN -m mark --mark 0xff
+    iptables -t mangle -A TRANSPROXY_DST_PREPARE -p udp -j MARK --set-mark 1
+    iptables -t mangle -A TRANSPROXY_DST_PREPARE -p tcp -j MARK --set-mark 1
+    iptables -t mangle -I OUTPUT 1 -j TRANSPROXY_DST_PREPARE
   fi
-  return $?
+
+  ## TODO: refine by https://github.com/openwrt/packages/blob/e60310eb2ebf256efb60c6fb6841c3edb30467dc/net/shadowsocks-libev/files/ss-rules
+  #if [ "$SELF_PROXY" = 1 ]; then
+  #  iptables -t nat -N TRANSPROXY_DST_PREPARE
+  #  iptables -t nat -A TRANSPROXY_DST_PREPARE -m set --match-set transproxy_dst_special dst -j RETURN
+  #  iptables -t nat -A TRANSPROXY_DST_PREPARE -p tcp $IPTABLES_EXTRA_ARGS -j $DST_DEFAULT_TARGET
+  #  iptables -t nat -I OUTPUT 1 -p tcp -j TRANSPROXY_DST_PREPARE
+  #fi
 }
+
+#init_iptables_udp() {
+#  # TODO: refine by https://github.com/openwrt/packages/blob/e60310eb2ebf256efb60c6fb6841c3edb30467dc/net/shadowsocks-libev/files/ss-rules
+#  if [ "$SELF_PROXY" = 1 ]; then
+#    iptables -t mangle -N TRANSPROXY_DST_PREPARE
+#    iptables -t mangle -A TRANSPROXY_DST_PREPARE -m set --match-set transproxy_dst_special -j RETURN
+#    iptables -t mangle -A TRANSPROXY_DST_PREPARE -m set --match-set transproxy_dst_proxy dst -j MARK --set-mark 1
+#    if [ "$DST_DEFAULT_TARGET" = "TRANSPROXY_DST_AC" ]; then
+#      iptables -t mangle -A TRANSPROXY_DST_PREPARE -m set --match-set transproxy_dst_direct dst -j RETURN
+#    fi
+#    iptables -t mangle -A TRANSPROXY_DST_PREPARE -p udp $IPTABLES_EXTRA_ARGS -j MARK --set-mark 1
+#    iptables -t mangle -I OUTPUT 1 -p udp -j TRANSPROXY_DST_PREPARE
+#  fi
+#  return $?
+#}
 
 parse_args() {
   SRC_DIRECT_FILES=/etc/transproxy/src-direct.txt
@@ -254,7 +271,7 @@ parse_args() {
 }
 
 parse_args "$@"
-flush_transproxy
+flush_rules
 init_ipset
-init_iptables_tcp
-init_iptables_udp
+init_route
+init_iptables
