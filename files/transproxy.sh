@@ -11,6 +11,8 @@
 # TODO:
 #   1. Check OUTPUT chain should use -A ... or -I, which better?
 
+TRANSPROXY_VERSION=0.0.9
+
 _add_prefix() {
   sed "s/^/$1/"
 }
@@ -24,7 +26,12 @@ _remove_comment() {
 }
 
 _split_by_space() {
+  # TODO: echo "$1" | tr ',' ' '
   tr ',' ' '
+}
+
+_apply_sysctl() {
+  [ $(sysctl -n "$1") != "$2" ] && sysctl -w "$1"="$2"
 }
 
 _get_reserved_ipv4() {
@@ -68,18 +75,14 @@ _get_reserved_ipv6() {
 	EOF
 }
 
-#_log() {
+#log() {
 #  # 1:alert, 2:crit, 3:err, 4:warn, 5:notice, 6:info, 7:debug, 8:emerg
 #  logger -st transproxy[$$] -p $1 $2
 #}
 
-print_usage() {
-  # TODO
-  cat << EOF
-Usage: $0 [options]
-    -f, --flush    Flush iptables, ipset then exit
-    -h, --help     Show this help message then exit
-EOF
+fix_sysctl() {
+  _apply_sysctl net.bridge.bridge-nf-call-iptables 0
+  [ "$DISABLE_IPV6" = 1 ] || _apply_sysctl net.bridge.bridge-nf-call-ip6tables 0
 }
 
 flush_rules() {
@@ -118,10 +121,8 @@ init_ipset() {
 }
 
 create_transproxy_chain() {
-  local table="$1"
-
   iptables-restore -n <<- EOF
-	*$table
+	*mangle
 
 	:TRANSPROXY_SRC_PREPARE - [0:0]
 	:TRANSPROXY_SRC_AC - [0:0]
@@ -130,7 +131,7 @@ create_transproxy_chain() {
 
 	# PREPARE
 	-A TRANSPROXY_SRC_PREPARE -m set --match-set transproxy_dst_special dst -j RETURN
-	-A TRANSPROXY_SRC_PREPARE -p $proto $IPTABLES_EXTRA_ARGS -j TRANSPROXY_SRC_AC
+	-A TRANSPROXY_SRC_PREPARE $IPTABLES_EXTRA_ARGS -j TRANSPROXY_SRC_AC
 
 	# SRC
 	-A TRANSPROXY_SRC_AC -m set --match-set transproxy_src_direct src -j RETURN
@@ -148,27 +149,26 @@ create_transproxy_chain() {
 }
 
 apply_transproxy_rules() {
-  local table="$1"
-  local proto="$2"
+  local proto="$1"
 
   if [ -z "$INTERFACES" ]; then
-    iptables -t $table -I PREROUTING 1 -p $proto -j TRANSPROXY_SRC_PREPARE
+    iptables -t mangle -I PREROUTING 1 -p $proto -j TRANSPROXY_SRC_PREPARE
   else
     for interface in $INTERFACES; do
-      iptables -t $table -I PREROUTING 1 -i $interface -p $proto -j TRANSPROXY_SRC_PREPARE
+      iptables -t mangle -I PREROUTING 1 -i $interface -p $proto -j TRANSPROXY_SRC_PREPARE
     done
   fi
 }
 
 init_iptables() {
-  # create common transproxy chain to mangle table, it's required for both tcp and udp.
-  create_transproxy_chain mangle
+  # create common transproxy chain for mangle table, it's required for both tcp and udp.
+  create_transproxy_chain
 
   # apply transparent proxy rules
-  apply_transproxy_rules mangle tcp
   iptables -t mangle -A TRANSPROXY_DST_FORWARD -p tcp -j TPROXY --on-ip $REMOTE_ADDR --on-port $REMOTE_PORT --tproxy-mark 1
-  apply_transproxy_rules mangle udp
+  apply_transproxy_rules tcp
   iptables -t mangle -A TRANSPROXY_DST_FORWARD -p udp -j TPROXY --on-ip $UDP_REMOTE_ADDR --on-port $UDP_REMOTE_PORT --tproxy-mark 1
+  apply_transproxy_rules udp
 
   if [ -n "$SELF_PROXY" ]; then
     iptables -t mangle -N TRANSPROXY_DST_PREPARE
@@ -202,6 +202,21 @@ init_iptables() {
 #  fi
 #  return $?
 #}
+
+print_usage() {
+  # TODO
+  cat << EOF
+transproxy $TRANSPROXY_VERSION
+A bridge of linux and transparent proxy.
+
+USAGE:
+    $0 [OPTIONS]
+
+OPTIONS:
+    -f, --flush    Flush iptables, ipset then exit
+    -h, --help     Show this help message then exit
+EOF
+}
 
 parse_args() {
   SRC_DIRECT_FILES=/etc/transproxy/src-direct.txt
@@ -258,19 +273,24 @@ parse_args() {
         DISABLE_IPV6=1
         shift 1
         ;;
+      -f|--flush)
+        flush_rules
+        exit 0
+        ;;
       -h|--help)
         print_usage
         exit 0
         ;;
       *)
         echo "unknown option $1"
-        return 1
+        exit 1
         ;;
     esac
   done
 }
 
 parse_args "$@"
+fix_sysctl
 flush_rules
 init_ipset
 init_route
