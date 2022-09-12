@@ -1,2 +1,4 @@
-https://github.com/shadowsocks/shadowsocks-rust/blob/master/configs/iptables_tproxy.sh
-https://github.com/shadowsocks/shadowsocks-rust/blob/master/configs/iptables_mixed.sh
+#log() {
+#  # 1:alert, 2:crit, 3:err, 4:warn, 5:notice, 6:info, 7:debug, 8:emerg
+#  logger -st transproxy[$$] -p $1 $2
+#}
