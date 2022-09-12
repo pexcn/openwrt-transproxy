@@ -37,13 +37,11 @@ define Package/transproxy/conffiles
 /etc/transproxy/src-normal.txt
 /etc/transproxy/dst-direct.txt
 /etc/transproxy/dst-proxy.txt
-/etc/transproxy/dst-special.txt
 /etc/transproxy/src-direct6.txt
 /etc/transproxy/src-proxy6.txt
 /etc/transproxy/src-normal6.txt
 /etc/transproxy/dst-direct6.txt
 /etc/transproxy/dst-proxy6.txt
-/etc/transproxy/dst-special6.txt
 /etc/transproxy/chnroute.txt
 /etc/transproxy/chnroute6.txt
 endef
@@ -62,13 +60,11 @@ define Package/transproxy/install
 	$(INSTALL_DATA) files/rules/src-normal.txt $(1)/etc/transproxy
 	$(INSTALL_DATA) files/rules/dst-direct.txt $(1)/etc/transproxy
 	$(INSTALL_DATA) files/rules/dst-proxy.txt $(1)/etc/transproxy
-	$(INSTALL_DATA) files/rules/dst-special.txt $(1)/etc/transproxy
 	$(INSTALL_DATA) files/rules/src-direct6.txt $(1)/etc/transproxy
 	$(INSTALL_DATA) files/rules/src-proxy6.txt $(1)/etc/transproxy
 	$(INSTALL_DATA) files/rules/src-normal6.txt $(1)/etc/transproxy
 	$(INSTALL_DATA) files/rules/dst-direct6.txt $(1)/etc/transproxy
 	$(INSTALL_DATA) files/rules/dst-proxy6.txt $(1)/etc/transproxy
-	$(INSTALL_DATA) files/rules/dst-special6.txt $(1)/etc/transproxy
 	$(INSTALL_DATA) files/rules/chnroute.txt $(1)/etc/transproxy
 	$(INSTALL_DATA) files/rules/chnroute6.txt $(1)/etc/transproxy
 endef
