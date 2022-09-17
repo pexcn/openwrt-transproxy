@@ -1,12 +1,12 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=transproxy
-PKG_VERSION:=0.2.2
+PKG_VERSION:=0.2.7
 PKG_RELEASE:=1
 
 PKG_SOURCE_PROTO:=git
 PKG_SOURCE_URL:=https://github.com/pexcn/transproxy.git
-PKG_SOURCE_VERSION:=4157d3be5e6e44c1e18d6e50bd63e36e23d560a0
+PKG_SOURCE_VERSION:=4a62f8fe02ff44a46f113b218aed29a50235a55d
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION)-$(PKG_SOURCE_VERSION).tar.gz
 PKG_SOURCE_SUBDIR:=$(PKG_NAME)-$(PKG_VERSION)-$(PKG_SOURCE_VERSION)
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)/$(PKG_SOURCE_SUBDIR)
@@ -22,8 +22,7 @@ define Package/transproxy
 	CATEGORY:=Network
 	TITLE:=A bridge of openwrt and transparent proxy.
 	URL:=https://github.com/pexcn/transproxy
-	# TODO: +ip or +ip-tiny.
-	DEPENDS:=+ip-tiny +ipset +iptables +ip6tables +iptables-mod-tproxy
+	DEPENDS:=+!ip-tiny:ip +ipset +iptables +ip6tables +iptables-mod-tproxy
 endef
 
 define Package/transproxy/description
