@@ -1,4 +1,97 @@
+#!/bin/sh /etc/rc.common
+#
+# Copyright (C) 2022 Sing Yu Chan <i@pexcn.me>
+#
+# This is free software, licensed under the GNU General Public License v3.
+# See /LICENSE for more information.
+#
+
+START=90
+STOP=10
+
+CONFIG=transproxy
+
+_uci_get_bool() {
+  local section="$1"
+  local option="$2"
+  local value=$(uci -q get $CONFIG.@${section}[0].$option)
+  case $value in
+    1|on|true|yes|enabled) return 0;;
+  esac
+  return 1
+}
+
+_uci_get_str() {
+  local section="$1"
+  local option="$2"
+  uci -q get $CONFIG.@${section}[0].$option
+}
+
 #log() {
 #  # 1:alert, 2:crit, 3:err, 4:warn, 5:notice, 6:info, 7:debug, 8:emerg
 #  logger -st transproxy[$$] -p $1 $2
 #}
+
+append_bool() {
+  local section="$1"
+  local option="$2"
+  local switch="$3"
+  _uci_get_bool "$section" "$option" && echo "$switch" || return 0
+}
+
+append_param() {
+  local section="$1"
+  local option="$2"
+  local switch="$3"
+  local value=$(_uci_get_str "$section" "$option")
+  [ -n "$value" ] || return 0
+  echo "$switch" "$value"
+}
+
+append_param_if_neq() {
+  local section="$1"
+  local option="$2"
+  local switch="$3"
+  local default="$4"
+  local value=$(_uci_get_str "$section" "$option")
+  [ -n "$value" ] || return 0
+  [ "$value" != "$default" ] || return 0
+  echo "$switch" "$value"
+}
+
+is_enabled() {
+  _uci_get_bool "$1" "enable"
+}
+
+call_flush() {
+  "$1" --flush $(append_bool "$1" "verbose" "--verbose")
+}
+
+call_transproxy() {
+  "$1" \
+    $(append_param "$1" "tcp_port" "--tcp-port") \
+    $(append_param "$1" "udp_port" "--udp-port") \
+    $(append_param "$1" "src_direct" "--src-direct") \
+    $(append_param "$1" "src_proxy" "--src-proxy") \
+    $(append_param "$1" "src_normal" "--src-normal") \
+    $(append_param "$1" "dst_direct" "--dst-direct") \
+    $(append_param "$1" "dst_proxy" "--dst-proxy") \
+    $(append_param_if_neq "$1" "src_default" "--src-default" "NORMAL") \
+    $(append_param_if_neq "$1" "dst_default" "--dst-default" "PROXY") \
+    $(append_bool "$1" "self_proxy" "--self-proxy") \
+    $(append_param "$1" "server" "--server") \
+    $(append_param "$1" "interface" "--interface") \
+    $(append_param "$1" "extra" "--extra") \
+    $(append_param "$1" "mark" "--mark") \
+    $(append_bool "$1" "verbose" "--verbose") || call_flush "$1"
+}
+
+start() {
+  ! is_enabled transproxy || call_transproxy transproxy
+  ! is_enabled transproxy6 || call_transproxy transproxy6
+}
+
+stop() {
+  call_flush transproxy
+  call_flush transproxy6
+}
