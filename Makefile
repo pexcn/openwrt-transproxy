@@ -51,6 +51,10 @@ define Package/transproxy/install
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/transproxy6 $(1)/usr/bin
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) files/transproxy.init $(1)/etc/init.d/transproxy
+	$(INSTALL_DIR) $(1)/etc/uci-defaults
+	$(INSTALL_BIN) files/transproxy.defaults $(1)/etc/uci-defaults/99-transproxy
+	$(INSTALL_DIR) $(1)/usr/share/transproxy
+	$(INSTALL_DATA) files/transproxy.include $(1)/usr/share/transproxy/transproxy.include
 	$(INSTALL_DIR) $(1)/etc/config
 	$(INSTALL_CONF) files/transproxy.config $(1)/etc/config/transproxy
 	$(INSTALL_DIR) $(1)/etc/transproxy
@@ -71,6 +75,8 @@ endef
 define Package/transproxy/postrm
 #!/bin/sh
 rmdir --ignore-fail-on-non-empty /etc/transproxy
+uci -q delete firewall.transproxy
+uci commit firewall
 exit 0
 endef
 
