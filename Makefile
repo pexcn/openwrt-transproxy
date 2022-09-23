@@ -45,6 +45,10 @@ define Package/transproxy/conffiles
 /etc/transproxy/chnroute6.txt
 endef
 
+define Build/Compile
+	true
+endef
+
 define Package/transproxy/install
 	$(INSTALL_DIR) $(1)/usr/bin
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/transproxy $(1)/usr/bin
