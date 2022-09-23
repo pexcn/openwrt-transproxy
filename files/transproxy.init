@@ -87,11 +87,15 @@ call_transproxy() {
 }
 
 start() {
-  ! is_enabled transproxy || call_transproxy transproxy
-  ! is_enabled transproxy6 || call_transproxy transproxy6
+  is_enabled transproxy && call_transproxy transproxy || call_flush transproxy
+  is_enabled transproxy6 && call_transproxy transproxy6 || call_flush transproxy6
 }
 
 stop() {
   call_flush transproxy
   call_flush transproxy6
+}
+
+restart() {
+  start
 }
