@@ -61,6 +61,8 @@ define Package/transproxy/install
 	$(INSTALL_BIN) files/transproxy.defaults $(1)/etc/uci-defaults/99-transproxy
 	$(INSTALL_DIR) $(1)/usr/share/transproxy
 	$(INSTALL_DATA) files/transproxy.firewall $(1)/usr/share/transproxy/firewall.include
+	$(INSTALL_DIR) $(1)/etc/sysctl.d
+	$(INSTALL_DATA) files/transproxy.sysctl $(1)/etc/sysctl.d/99-transproxy.conf
 	$(INSTALL_DIR) $(1)/etc/transproxy
 	$(INSTALL_DATA) files/rules/src-direct.txt $(1)/etc/transproxy
 	$(INSTALL_DATA) files/rules/src-proxy.txt $(1)/etc/transproxy
