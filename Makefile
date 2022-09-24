@@ -79,6 +79,7 @@ endef
 define Package/transproxy/postrm
 #!/bin/sh
 rmdir --ignore-fail-on-non-empty /etc/transproxy
+rmdir --ignore-fail-on-non-empty /usr/share/transproxy
 uci -q delete firewall.transproxy
 uci commit firewall
 exit 0
