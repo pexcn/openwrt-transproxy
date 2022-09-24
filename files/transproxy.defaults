@@ -3,7 +3,7 @@
 uci -q batch <<-EOF
 delete firewall.transproxy
 set firewall.transproxy=include
-set firewall.transproxy.path=/usr/share/transproxy/transproxy.include
+set firewall.transproxy.path=/usr/share/transproxy/firewall.include
 set firewall.transproxy.reload=1
 commit firewall
 EOF
