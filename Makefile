@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=transproxy
 PKG_VERSION:=0.2.11
-PKG_RELEASE:=2
+PKG_RELEASE:=3
 
 PKG_SOURCE_PROTO:=git
 PKG_SOURCE_URL:=https://github.com/pexcn/transproxy.git
@@ -18,8 +18,8 @@ PKG_MAINTAINER:=pexcn <i@pexcn.me>
 include $(INCLUDE_DIR)/package.mk
 
 define Package/transproxy
-	SECTION:=net
-	CATEGORY:=Network
+	SECTION:=utils
+	CATEGORY:=Utilities
 	TITLE:=A bridge of openwrt and transparent proxy.
 	URL:=https://github.com/pexcn/transproxy
 	DEPENDS:=+!ip:ip-tiny +ipset +iptables +ip6tables +iptables-mod-tproxy
