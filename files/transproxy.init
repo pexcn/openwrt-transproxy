@@ -86,6 +86,11 @@ call_transproxy() {
     $(append_bool "$1" "verbose" "--verbose") || call_flush "$1"
 }
 
+boot() {
+  sleep 10
+  start
+}
+
 start() {
   is_enabled transproxy && call_transproxy transproxy || call_flush transproxy
   is_enabled transproxy6 && call_transproxy transproxy6 || call_flush transproxy6
