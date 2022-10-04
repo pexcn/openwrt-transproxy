@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=transproxy
 PKG_VERSION:=0.3.0
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 
 PKG_SOURCE_PROTO:=git
 PKG_SOURCE_URL:=https://github.com/pexcn/transproxy.git
@@ -53,6 +53,7 @@ define Package/transproxy/install
 	$(INSTALL_DIR) $(1)/usr/bin
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/transproxy $(1)/usr/bin
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/transproxy6 $(1)/usr/bin
+	$(INSTALL_BIN) files/transproxy-daily.sh $(1)/usr/bin
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) files/transproxy.init $(1)/etc/init.d/transproxy
 	$(INSTALL_DIR) $(1)/etc/config
@@ -83,6 +84,7 @@ define Package/transproxy/postrm
 rmdir --ignore-fail-on-non-empty /etc/transproxy /usr/share/transproxy
 uci -q delete firewall.transproxy
 uci commit firewall
+(crontab -l | grep -v "transproxy") | crontab -
 exit 0
 endef
 
