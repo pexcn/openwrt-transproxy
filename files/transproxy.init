@@ -27,11 +27,6 @@ _uci_get_str() {
   uci -q get $CONFIG.@${section}[0].$option
 }
 
-#log() {
-#  # 1:alert, 2:crit, 3:err, 4:warn, 5:notice, 6:info, 7:debug, 8:emerg
-#  logger -st transproxy[$$] -p $1 $2
-#}
-
 append_bool() {
   local section="$1"
   local option="$2"

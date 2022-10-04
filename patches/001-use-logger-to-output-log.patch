@@ -1,0 +1,110 @@
+From 09c97ae6754908ae310f6b7ad73f93b038dc02c5 Mon Sep 17 00:00:00 2001
+From: pexcn <i@pexcn.me>
+Date: Wed, 5 Oct 2022 00:51:51 +0800
+Subject: [PATCH] use logger to output log
+
+Signed-off-by: pexcn <i@pexcn.me>
+---
+ transproxy  | 25 ++++++++-----------------
+ transproxy6 | 25 ++++++++-----------------
+ 2 files changed, 16 insertions(+), 34 deletions(-)
+
+diff --git a/transproxy b/transproxy
+index 1d7b458..440848e 100755
+--- a/transproxy
++++ b/transproxy
+@@ -119,35 +119,26 @@ _get_special_ip() {
+   ip route get 8.8.8.8 | sed 's/^.*src \([^ ]*\).*$/\1/;q'
+ }
+ 
+-_get_time() {
+-  date '+%Y-%m-%d %T'
+-}
++#log() {
++#  # 1:alert, 2:crit, 3:err, 4:warn, 5:notice, 6:info, 7:debug, 8:emerg
++#  logger -s -t transproxy[$$] -p $1 $2
++#}
+ 
+ debug() {
+   [ "$VERBOSE" = 1 ] || return 0
+-  local time=$(_get_time)
+-  printf "[${time}] [DEBUG]: %s\n" "$*"
++  logger -s -t ${TRANSPROXY_NAME}[$$] -p 7 "$*"
+ }
+ 
+ info() {
+-  local green='\e[0;32m'
+-  local clear='\e[0m'
+-  local time=$(_get_time)
+-  printf "${green}[${time}] [INFO]: ${clear}%s\n" "$*"
++  logger -s -t ${TRANSPROXY_NAME}[$$] -p 6 "$*"
+ }
+ 
+ warn() {
+-  local yellow='\e[1;33m'
+-  local clear='\e[0m'
+-  local time=$(_get_time)
+-  printf "${yellow}[${time}] [WARN]: ${clear}%s\n" "$*" >&2
++  logger -s -t ${TRANSPROXY_NAME}[$$] -p 4 "$*"
+ }
+ 
+ error() {
+-  local red='\e[0;31m'
+-  local clear='\e[0m'
+-  local time=$(_get_time)
+-  printf "${red}[${time}] [ERROR]: ${clear}%s\n" "$*" >&2
++  logger -s -t ${TRANSPROXY_NAME}[$$] -p 3 "$*"
+ }
+ 
+ generate_ipset_rules() {
+diff --git a/transproxy6 b/transproxy6
+index 1cd12f0..f6db0d0 100755
+--- a/transproxy6
++++ b/transproxy6
+@@ -119,35 +119,26 @@ _get_special_ip() {
+   ip route get 2001:4860:4860::8888 | sed 's/^.*src \([^ ]*\).*$/\1/;q'
+ }
+ 
+-_get_time() {
+-  date '+%Y-%m-%d %T'
+-}
++#log() {
++#  # 1:alert, 2:crit, 3:err, 4:warn, 5:notice, 6:info, 7:debug, 8:emerg
++#  logger -s -t transproxy[$$] -p $1 $2
++#}
+ 
+ debug() {
+   [ "$VERBOSE" = 1 ] || return 0
+-  local time=$(_get_time)
+-  printf "[${time}] [DEBUG]: %s\n" "$*"
++  logger -s -t ${TRANSPROXY_NAME}[$$] -p 7 "$*"
+ }
+ 
+ info() {
+-  local green='\e[0;32m'
+-  local clear='\e[0m'
+-  local time=$(_get_time)
+-  printf "${green}[${time}] [INFO]: ${clear}%s\n" "$*"
++  logger -s -t ${TRANSPROXY_NAME}[$$] -p 6 "$*"
+ }
+ 
+ warn() {
+-  local yellow='\e[1;33m'
+-  local clear='\e[0m'
+-  local time=$(_get_time)
+-  printf "${yellow}[${time}] [WARN]: ${clear}%s\n" "$*" >&2
++  logger -s -t ${TRANSPROXY_NAME}[$$] -p 4 "$*"
+ }
+ 
+ error() {
+-  local red='\e[0;31m'
+-  local clear='\e[0m'
+-  local time=$(_get_time)
+-  printf "${red}[${time}] [ERROR]: ${clear}%s\n" "$*" >&2
++  logger -s -t ${TRANSPROXY_NAME}[$$] -p 3 "$*"
+ }
+ 
+ generate_ipset_rules() {
+-- 
+2.35.1
+
