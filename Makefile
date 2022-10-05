@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=transproxy
 PKG_VERSION:=0.3.0
-PKG_RELEASE:=3
+PKG_RELEASE:=4
 
 PKG_SOURCE_PROTO:=git
 PKG_SOURCE_URL:=https://github.com/pexcn/transproxy.git
@@ -77,6 +77,14 @@ define Package/transproxy/install
 	$(INSTALL_DATA) files/rules/dst-proxy6.txt $(1)/etc/transproxy
 	$(INSTALL_DATA) files/rules/chnroute.txt $(1)/etc/transproxy
 	$(INSTALL_DATA) files/rules/chnroute6.txt $(1)/etc/transproxy
+endef
+
+define Package/transproxy/postinst
+#!/bin/sh
+if ! crontab -l | grep -q "transproxy"; then
+  (crontab -l; echo -e "# transproxy\n5 3 * * * /usr/bin/transproxy-daily.sh") | crontab -
+fi
+exit 0
 endef
 
 define Package/transproxy/postrm

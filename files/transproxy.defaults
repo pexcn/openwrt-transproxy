@@ -8,8 +8,4 @@ set firewall.transproxy.reload=1
 commit firewall
 EOF
 
-if ! crontab -l | grep -q transproxy; then
-  (crontab -l; echo -e "# transproxy\n5 3 * * * /usr/bin/transproxy-daily.sh") | crontab -
-fi
-
 exit 0
