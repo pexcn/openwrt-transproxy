@@ -54,6 +54,15 @@ append_param_if_neq() {
   echo "$switch" "$value"
 }
 
+execute_hook_script() {
+  local path="$1"
+  for script in $(find "$path" -type f | sort -n); do
+    logger -s -t transproxy-hook[$$] -p 6 "execute hook script: $script"
+    [ -x "$script" ] || chmod +x "$script"
+    "$script"
+  done
+}
+
 is_enabled() {
   _uci_get_bool "$1" "enable"
 }
@@ -87,13 +96,17 @@ boot() {
 }
 
 start() {
+  execute_hook_script /etc/transproxy/pre-start.d
   is_enabled transproxy && call_transproxy transproxy || call_flush transproxy
   is_enabled transproxy6 && call_transproxy transproxy6 || call_flush transproxy6
+  execute_hook_script /etc/transproxy/post-start.d
 }
 
 stop() {
+  execute_hook_script /etc/transproxy/pre-stop.d
   call_flush transproxy
   call_flush transproxy6
+  execute_hook_script /etc/transproxy/post-stop.d
 }
 
 restart() {

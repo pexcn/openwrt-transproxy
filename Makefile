@@ -77,6 +77,10 @@ define Package/transproxy/install
 	$(INSTALL_DATA) files/rules/dst-proxy6.txt $(1)/etc/transproxy
 	$(INSTALL_DATA) files/rules/chnroute.txt $(1)/etc/transproxy
 	$(INSTALL_DATA) files/rules/chnroute6.txt $(1)/etc/transproxy
+	$(INSTALL_DIR) $(1)/etc/transproxy/pre-start.d
+	$(INSTALL_DIR) $(1)/etc/transproxy/post-start.d
+	$(INSTALL_DIR) $(1)/etc/transproxy/pre-stop.d
+	$(INSTALL_DIR) $(1)/etc/transproxy/post-stop.d
 endef
 
 define Package/transproxy/postinst
@@ -89,6 +93,7 @@ endef
 
 define Package/transproxy/postrm
 #!/bin/sh
+rmdir --ignore-fail-on-non-empty /etc/transproxy/pre-start.d /etc/transproxy/post-start.d /etc/transproxy/pre-stop.d /etc/transproxy/post-stop.d
 rmdir --ignore-fail-on-non-empty /etc/transproxy /usr/share/transproxy
 uci -q delete firewall.transproxy
 uci commit firewall
