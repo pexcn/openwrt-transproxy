@@ -68,11 +68,11 @@ is_enabled() {
 }
 
 call_flush() {
-  "$1" --flush $(append_bool "$1" "verbose" "--verbose")
+  eval "$1" --flush $(append_bool "$1" "verbose" "--verbose")
 }
 
 call_transproxy() {
-  "$1" \
+  eval "$1" \
     $(append_param "$1" "tcp_port" "--tcp-port") \
     $(append_param "$1" "udp_port" "--udp-port") \
     $(append_param "$1" "src_direct" "--src-direct") \
