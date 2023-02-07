@@ -9,7 +9,7 @@ The configuration file is in `/etc/config/transproxy`, see [@pexcn/transproxy#us
 ## License
 
 ```txt
-Copyright (C) 2022, Sing Yu Chan <i@pexcn.me>
+Copyright (C) 2022-2023, Sing Yu Chan <pexcn97@gmail.com>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

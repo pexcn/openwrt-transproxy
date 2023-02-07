@@ -1,6 +1,6 @@
 #!/bin/sh /etc/rc.common
 #
-# Copyright (C) 2022 Sing Yu Chan <i@pexcn.me>
+# Copyright (C) 2022-2023 Sing Yu Chan <pexcn97@gmail.com>
 #
 # This is free software, licensed under the GNU General Public License v3.
 # See /LICENSE for more information.

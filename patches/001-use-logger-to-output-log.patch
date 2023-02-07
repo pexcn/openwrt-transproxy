@@ -1,9 +1,9 @@
 From 914ac7713c7994b09395a99c1031c567014d4bf7 Mon Sep 17 00:00:00 2001
-From: pexcn <i@pexcn.me>
+From: pexcn <pexcn97@gmail.com>
 Date: Sun, 8 Jan 2023 17:54:06 +0800
 Subject: [PATCH] use logger to output log
 
-Signed-off-by: pexcn <i@pexcn.me>
+Signed-off-by: pexcn <pexcn97@gmail.com>
 ---
  transproxy  | 25 ++++++++-----------------
  transproxy6 | 25 ++++++++-----------------
