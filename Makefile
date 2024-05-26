@@ -85,6 +85,7 @@ endef
 
 define Package/transproxy/postinst
 #!/bin/sh
+exec 2>/dev/null
 if ! crontab -l | grep -q "transproxy"; then
   (crontab -l; echo -e "# transproxy\n5 3 * * * /usr/bin/transproxy-daily.sh") | crontab -
 fi
